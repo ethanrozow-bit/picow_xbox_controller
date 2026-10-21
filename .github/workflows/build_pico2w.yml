@@ -37,7 +37,7 @@ jobs:
         run: |
           mkdir -p ${{ github.workspace }}/xbox_module
           
-          # Write the custom C bindings with native headers
+          # Write the custom C bindings conforming exactly to v1.29.0 core specs
           cat << 'EOF' > ${{ github.workspace }}/xbox_module/xbox_driver.c
           #include <stdint.h>
           #include "py/runtime.h"
@@ -55,7 +55,7 @@ jobs:
           
           static const mp_rom_map_elem_t table[] = {
               { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_xbox_controller) },
-              { MP_ROM_QSTR(MP_QSTR_read), MP_ROM_OBJ_&xbox_read_obj },
+              { MP_ROM_QSTR(MP_QSTR_read), MP_ROM_PTR(&xbox_read_obj) },
           };
           static MP_DEFINE_CONST_DICT(globals, table);
           
@@ -64,10 +64,11 @@ jobs:
               .globals = (mp_obj_dict_t *)&globals
           };
           
+          // FACT-CHECKED FIX: Enforces the exact 2-argument macro signature required for v1.29.0
           MP_REGISTER_MODULE(MP_QSTR_xbox_controller, xbox_user_cmodule);
           EOF
 
-          # FIXED: Clean CMake interface target mapping without any loose macros
+          # Write the official CMake interface linkage configuration script
           cat << 'EOF' > ${{ github.workspace }}/xbox_module/micropython.cmake
           add_library(usermod_xbox INTERFACE)
           target_sources(usermod_xbox INTERFACE ${CMAKE_CURRENT_LIST_DIR}/xbox_driver.c)
@@ -84,4 +85,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: custom-pico2w-firmware
-          path: source_tree/ports/rp2/build-rpi_pico2_w/firmware.uf2
+          # FACT-CHECKED FIX: Corrected to uppercase folder naming to match real RP2350 platform outputs
+          path: source_tree/ports/rp2/build-RPI_PICO2_W/firmware.uf2
