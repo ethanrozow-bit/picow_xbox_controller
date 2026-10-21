@@ -1,0 +1,61 @@
+name: Build Custom Pico 2 W Firmware
+
+on:
+  workflow_dispatch: # Allows you to manually trigger the build by clicking a button
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install ARM GNU Toolchain and Build Tools
+        run: |
+          sudo apt update
+          sudo apt install -y cmake build-essential gcc-arm-none-eabi libnewlib-arm-none-eabi python3
+
+      - name: Build Cross-Compiler Binary
+        run: |
+          make -C mpy-cross
+
+      - name: Inject Custom Xbox Controller Module Files
+        run: |
+          mkdir -p xbox_module
+          
+          # Generate the direct C driver module mappings
+          cat << 'EOF' > xbox_module/xbox_driver.c
+          #include "py/runtime.h"
+          #include "py/obj.h"
+          static int16_t x=0, y=0, b=0;
+          static mp_obj_t xbox_read(void) {
+              mp_obj_t t[] = {mp_obj_new_int(x), mp_obj_new_int(y), mp_obj_new_int(b)};
+              return mp_obj_new_tuple(3, t);
+          }
+          static MP_DEFINE_CONST_FUN_OBJ_0(xbox_read_obj, xbox_read);
+          static const mp_rom_map_elem_t table[] = {
+              { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_xbox_controller) },
+              { MP_ROM_QSTR(MP_QSTR_read), MP_ROM_OBJ_&xbox_read_obj },
+          };
+          static MP_DEFINE_CONST_DICT(globals, table);
+          const mp_obj_module_t xbox_user_cmodule = {.base = { &mp_type_module }, .globals = (mp_obj_dict_t *)&globals};
+          MP_REGISTER_MODULE(MP_QSTR_xbox_controller, xbox_user_cmodule);
+          EOF
+
+          # Generate the CMake configuration script
+          cat << 'EOF' > xbox_module/micropython.cmake
+          micropython_add_to_list(MICROPY_SOURCE_USERMOD ${CMAKE_CURRENT_LIST_DIR}/xbox_driver.c)
+          EOF
+
+      - name: Compile Custom Firmware Image
+        run: |
+          cd ports/rp2
+          make BOARD=RPI_PICO2W USER_C_MODULES=../../xbox_module
+
+      - name: Upload Completed Firmware Binary Asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: custom-pico2w-firmware
+          path: ports/rp2/build-RPI_PICO2W/firmware.uf2
