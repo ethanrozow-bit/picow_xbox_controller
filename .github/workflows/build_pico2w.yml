@@ -17,12 +17,8 @@ jobs:
           sudo apt update
           sudo apt install -y cmake build-essential gcc-arm-none-eabi libnewlib-arm-none-eabi python3
 
-      - name: Build Cross-Compiler Binary
-        run: |
-          make -C mpy-cross
-
-      # --- CRITICAL FIX INCLUDED BELOW ---
-      - name: Initialize Pico Hardware Submodules
+      # --- CRITICAL PATH VARIATION FIX INCLUDED BELOW ---
+      - name: Initialize Submodules and Dependencies
         run: |
           cd ports/rp2
           make BOARD=RPI_PICO2W submodules
@@ -57,6 +53,7 @@ jobs:
       - name: Compile Custom Firmware Image
         run: |
           cd ports/rp2
+          # Unified compilation entry points manage requirements automatically
           make BOARD=RPI_PICO2W USER_C_MODULES=../../xbox_module
 
       - name: Upload Completed Firmware Binary Asset
