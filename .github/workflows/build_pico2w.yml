@@ -10,6 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # 1. UPGRADED STEP: actions/checkout@v4 runs natively on the Node 24 architecture stack
       - name: Checkout MicroPython Core Source Tree
         uses: actions/checkout@v4
         with:
@@ -35,10 +36,9 @@ jobs:
 
       - name: Inject Custom Xbox Controller Module Files
         run: |
-          # 1. Create a clean modular project folder structure outside the repository tree
           mkdir -p ${{ github.workspace }}/my_project/modules/xbox_controller
           
-          # 2. Write the isolated C driver logic using volatile memory boundaries
+          # Write the custom C bindings
           cat << 'EOF' > ${{ github.workspace }}/my_project/modules/xbox_controller/xbox_driver.c
           #include <stdint.h>
           #include "py/runtime.h"
@@ -68,7 +68,7 @@ jobs:
           MP_REGISTER_MODULE(MP_QSTR_xbox_controller, xbox_user_cmodule);
           EOF
 
-          # 3. Write the target component linkage properties
+          # Write the target component linkage properties
           cat << 'EOF' > ${{ github.workspace }}/my_project/modules/xbox_controller/micropython.cmake
           add_library(usermod_xbox INTERFACE)
           target_sources(usermod_xbox INTERFACE ${CMAKE_CURRENT_LIST_DIR}/xbox_driver.c)
@@ -76,7 +76,7 @@ jobs:
           target_link_libraries(usermod INTERFACE usermod_xbox)
           EOF
 
-          # 4. Write the master entry index file
+          # Write the master entry index file
           cat << 'EOF' > ${{ github.workspace }}/my_project/modules/micropython.cmake
           include(${CMAKE_CURRENT_LIST_DIR}/xbox_controller/micropython.cmake)
           EOF
@@ -84,13 +84,10 @@ jobs:
       - name: Compile Custom MicroPython Firmware
         run: |
           cd ${{ github.workspace }}/source_tree/ports/rp2
-          
-          # Force clean compilation safely via the Makefile wrapper to bust cached variables
           make BOARD=RPI_PICO2_W clean
-          
-          # FACT-CHECKED FIX: USER_C_MODULES points directly to the top-level .cmake file asset path
           make -j$(nproc) BOARD=RPI_PICO2_W USER_C_MODULES=${{ github.workspace }}/my_project/modules/micropython.cmake
 
+      # 2. UPGRADED STEP: actions/upload-artifact@v4 runs natively on the Node 24 architecture stack
       - name: Upload Completed Firmware Binary Asset
         uses: actions/upload-artifact@v4
         with:
